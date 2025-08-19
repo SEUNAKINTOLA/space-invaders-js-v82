@@ -1,7 +1,12 @@
 /**
- * Represents a position vector in 2D space
+ * @file Entity.ts
+ * @description Base class for all game entities in Space Invaders
  */
-interface Vector2D {
+
+/**
+ * Represents the position of an entity in 2D space
+ */
+export interface Vector2D {
     x: number;
     y: number;
 }
@@ -9,14 +14,23 @@ interface Vector2D {
 /**
  * Represents the dimensions of an entity
  */
-interface Dimensions {
+export interface Dimensions {
     width: number;
     height: number;
 }
 
 /**
- * Base entity class for all game objects
- * Provides core functionality for position, movement, and basic game object properties
+ * Represents the boundaries of an entity for collision detection
+ */
+export interface Bounds {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
+
+/**
+ * Base entity class that all game objects inherit from
  */
 export abstract class Entity {
     private _position: Vector2D;
@@ -42,7 +56,6 @@ export abstract class Entity {
 
     /**
      * Generates a unique identifier for the entity
-     * @returns Unique string identifier
      */
     private generateId(): string {
         return `entity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -58,97 +71,71 @@ export abstract class Entity {
     }
 
     /**
-     * Gets the entity's current position
+     * Calculates the current bounds of the entity for collision detection
      */
-    public get position(): Vector2D {
-        return { ...this._position };
-    }
-
-    /**
-     * Sets the entity's position
-     */
-    public set position(newPosition: Vector2D) {
-        this._position = { ...newPosition };
-    }
-
-    /**
-     * Gets the entity's current velocity
-     */
-    public get velocity(): Vector2D {
-        return { ...this._velocity };
-    }
-
-    /**
-     * Sets the entity's velocity
-     */
-    public set velocity(newVelocity: Vector2D) {
-        this._velocity = { ...newVelocity };
-    }
-
-    /**
-     * Gets the entity's dimensions
-     */
-    public get dimensions(): Dimensions {
-        return { ...this._dimensions };
-    }
-
-    /**
-     * Gets the entity's unique identifier
-     */
-    public get id(): string {
-        return this._id;
-    }
-
-    /**
-     * Gets whether the entity is active
-     */
-    public get active(): boolean {
-        return this._active;
-    }
-
-    /**
-     * Sets whether the entity is active
-     */
-    public set active(value: boolean) {
-        this._active = value;
-    }
-
-    /**
-     * Gets the entity's bounding box for collision detection
-     * @returns Object containing position and dimensions for collision checking
-     */
-    public getBoundingBox(): { position: Vector2D; dimensions: Dimensions } {
+    public getBounds(): Bounds {
         return {
-            position: this.position,
-            dimensions: this.dimensions
+            top: this._position.y,
+            right: this._position.x + this._dimensions.width,
+            bottom: this._position.y + this._dimensions.height,
+            left: this._position.x
         };
     }
 
     /**
      * Checks if this entity collides with another entity
      * @param other - The other entity to check collision with
-     * @returns True if entities collide, false otherwise
      */
     public collidesWith(other: Entity): boolean {
-        const thisBox = this.getBoundingBox();
-        const otherBox = other.getBoundingBox();
+        const bounds = this.getBounds();
+        const otherBounds = other.getBounds();
 
-        return (
-            thisBox.position.x < otherBox.position.x + otherBox.dimensions.width &&
-            thisBox.position.x + thisBox.dimensions.width > otherBox.position.x &&
-            thisBox.position.y < otherBox.position.y + otherBox.dimensions.height &&
-            thisBox.position.y + thisBox.dimensions.height > otherBox.position.y
-        );
+        return !(bounds.left >= otherBounds.right ||
+                bounds.right <= otherBounds.left ||
+                bounds.top >= otherBounds.bottom ||
+                bounds.bottom <= otherBounds.top);
     }
 
-    /**
-     * Abstract method to be implemented by derived classes
-     * Handles specific behavior when entity is destroyed
-     */
-    public abstract onDestroy(): void;
+    // Getters and setters
+    get position(): Vector2D {
+        return { ...this._position };
+    }
+
+    set position(newPosition: Vector2D) {
+        this._position = { ...newPosition };
+    }
+
+    get velocity(): Vector2D {
+        return { ...this._velocity };
+    }
+
+    set velocity(newVelocity: Vector2D) {
+        this._velocity = { ...newVelocity };
+    }
+
+    get dimensions(): Dimensions {
+        return { ...this._dimensions };
+    }
+
+    get active(): boolean {
+        return this._active;
+    }
+
+    set active(value: boolean) {
+        this._active = value;
+    }
+
+    get id(): string {
+        return this._id;
+    }
 }
 
 /**
- * Export interfaces for use in other files
+ * Types of entities in the game
  */
-export type { Vector2D, Dimensions };
+export enum EntityType {
+    PLAYER = 'PLAYER',
+    ENEMY = 'ENEMY',
+    PROJECTILE = 'PROJECTILE',
+    POWERUP = 'POWERUP'
+}

@@ -4,179 +4,154 @@
  */
 
 /**
- * Represents the possible states a player can be in
+ * Represents the possible movement directions for the player
  */
-export enum PlayerState {
-  ALIVE = 'ALIVE',
-  INVULNERABLE = 'INVULNERABLE',
-  DEAD = 'DEAD'
+export enum PlayerMovementDirection {
+  LEFT = 'LEFT',
+  RIGHT = 'RIGHT',
+  NONE = 'NONE'
 }
 
 /**
- * Interface defining the configuration options for a Player instance
+ * Interface defining the player's state
  */
-export interface PlayerConfig {
+export interface PlayerState {
   x: number;
   y: number;
   width: number;
   height: number;
   speed: number;
-  lives: number;
-  maxLives?: number;
+  health: number;
+  isAlive: boolean;
+  score: number;
 }
 
 /**
- * Player class representing the main player entity in the game
+ * Player class representing the main controllable entity in the game
  */
 export class Player {
-  private readonly _width: number;
-  private readonly _height: number;
-  private readonly _speed: number;
-  private readonly _maxLives: number;
+  private readonly maxHealth: number = 100;
+  private readonly defaultSpeed: number = 5;
+  private readonly minX: number = 0;
+  private readonly maxX: number = 800; // Default canvas width
 
-  private _x: number;
-  private _y: number;
-  private _lives: number;
-  private _state: PlayerState;
-  private _invulnerabilityTimer: number;
-  private _score: number;
+  private state: PlayerState;
 
   /**
    * Creates a new Player instance
-   * @param config - Configuration options for the player
+   * @param x - Initial x position
+   * @param y - Initial y position
+   * @param width - Player width
+   * @param height - Player height
    */
-  constructor(config: PlayerConfig) {
-    this._x = config.x;
-    this._y = config.y;
-    this._width = config.width;
-    this._height = config.height;
-    this._speed = config.speed;
-    this._lives = config.lives;
-    this._maxLives = config.maxLives || 3;
-    this._state = PlayerState.ALIVE;
-    this._invulnerabilityTimer = 0;
-    this._score = 0;
-
-    this.validateConfig(config);
+  constructor(
+    x: number = 400,
+    y: number = 550,
+    width: number = 50,
+    height: number = 50
+  ) {
+    this.state = {
+      x,
+      y,
+      width,
+      height,
+      speed: this.defaultSpeed,
+      health: this.maxHealth,
+      isAlive: true,
+      score: 0
+    };
   }
 
   /**
-   * Validates the configuration parameters
-   * @param config - Configuration to validate
-   * @throws Error if configuration is invalid
+   * Updates the player's position based on the movement direction
+   * @param direction - Direction of movement
+   * @param deltaTime - Time elapsed since last update
    */
-  private validateConfig(config: PlayerConfig): void {
-    if (config.width <= 0 || config.height <= 0) {
-      throw new Error('Player dimensions must be positive numbers');
-    }
-    if (config.speed <= 0) {
-      throw new Error('Player speed must be a positive number');
-    }
-    if (config.lives <= 0 || config.lives > this._maxLives) {
-      throw new Error(`Lives must be between 1 and ${this._maxLives}`);
-    }
-  }
+  public move(direction: PlayerMovementDirection, deltaTime: number): void {
+    const movement = this.calculateMovement(direction, deltaTime);
+    const newX = this.state.x + movement;
 
-  // Getters
-  get x(): number { return this._x; }
-  get y(): number { return this._y; }
-  get width(): number { return this._width; }
-  get height(): number { return this._height; }
-  get speed(): number { return this._speed; }
-  get lives(): number { return this._lives; }
-  get state(): PlayerState { return this._state; }
-  get score(): number { return this._score; }
-  get isAlive(): boolean { return this._state !== PlayerState.DEAD; }
-
-  /**
-   * Updates the player's position
-   * @param deltaX - Change in x position
-   * @param deltaY - Change in y position
-   */
-  move(deltaX: number, deltaY: number): void {
-    this._x += deltaX * this._speed;
-    this._y += deltaY * this._speed;
+    this.state.x = this.clampPosition(newX);
   }
 
   /**
-   * Sets the player's absolute position
-   * @param x - New x position
-   * @param y - New y position
+   * Applies damage to the player
+   * @param damage - Amount of damage to apply
+   * @returns boolean indicating if the player is still alive
    */
-  setPosition(x: number, y: number): void {
-    this._x = x;
-    this._y = y;
-  }
+  public takeDamage(damage: number): boolean {
+    if (!this.state.isAlive) return false;
 
-  /**
-   * Handles player taking damage
-   * @returns boolean indicating if the player was damaged
-   */
-  takeDamage(): boolean {
-    if (this._state === PlayerState.INVULNERABLE) {
-      return false;
-    }
-
-    this._lives--;
+    this.state.health = Math.max(0, this.state.health - damage);
     
-    if (this._lives <= 0) {
-      this._state = PlayerState.DEAD;
-    } else {
-      this._state = PlayerState.INVULNERABLE;
-      this._invulnerabilityTimer = 2000; // 2 seconds of invulnerability
+    if (this.state.health <= 0) {
+      this.state.isAlive = false;
     }
 
-    return true;
-  }
-
-  /**
-   * Updates the player's state
-   * @param deltaTime - Time elapsed since last update in milliseconds
-   */
-  update(deltaTime: number): void {
-    if (this._state === PlayerState.INVULNERABLE) {
-      this._invulnerabilityTimer -= deltaTime;
-      if (this._invulnerabilityTimer <= 0) {
-        this._state = PlayerState.ALIVE;
-        this._invulnerabilityTimer = 0;
-      }
-    }
+    return this.state.isAlive;
   }
 
   /**
    * Adds points to the player's score
    * @param points - Points to add
    */
-  addScore(points: number): void {
-    if (points < 0) {
-      throw new Error('Cannot add negative points');
-    }
-    this._score += points;
+  public addScore(points: number): void {
+    if (points < 0) return;
+    this.state.score += points;
   }
 
   /**
-   * Adds an extra life to the player if below maximum
-   * @returns boolean indicating if life was added
+   * Sets the player's movement speed
+   * @param speed - New speed value
    */
-  addLife(): boolean {
-    if (this._lives < this._maxLives) {
-      this._lives++;
-      return true;
-    }
-    return false;
+  public setSpeed(speed: number): void {
+    if (speed <= 0) return;
+    this.state.speed = speed;
+  }
+
+  /**
+   * Returns the current player state
+   */
+  public getState(): PlayerState {
+    return { ...this.state };
   }
 
   /**
    * Resets the player to initial state
-   * @param config - Optional configuration for reset state
    */
-  reset(config?: Partial<PlayerConfig>): void {
-    if (config?.x !== undefined) this._x = config.x;
-    if (config?.y !== undefined) this._y = config.y;
-    if (config?.lives !== undefined) this._lives = config.lives;
-    
-    this._state = PlayerState.ALIVE;
-    this._invulnerabilityTimer = 0;
-    this._score = 0;
+  public reset(): void {
+    this.state = {
+      ...this.state,
+      health: this.maxHealth,
+      isAlive: true,
+      score: 0,
+      speed: this.defaultSpeed
+    };
+  }
+
+  /**
+   * Calculates movement distance based on direction and time
+   */
+  private calculateMovement(direction: PlayerMovementDirection, deltaTime: number): number {
+    const normalizedDelta = deltaTime / 1000; // Convert to seconds
+
+    switch (direction) {
+      case PlayerMovementDirection.LEFT:
+        return -this.state.speed * normalizedDelta;
+      case PlayerMovementDirection.RIGHT:
+        return this.state.speed * normalizedDelta;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Ensures the player stays within the game boundaries
+   */
+  private clampPosition(newX: number): number {
+    const minBoundary = this.minX;
+    const maxBoundary = this.maxX - this.state.width;
+
+    return Math.max(minBoundary, Math.min(maxBoundary, newX));
   }
 }
