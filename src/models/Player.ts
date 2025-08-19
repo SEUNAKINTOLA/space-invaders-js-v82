@@ -4,199 +4,179 @@
  */
 
 /**
- * Represents the movement direction of the player
+ * Represents the possible states a player can be in
  */
-export enum PlayerMovementDirection {
-  LEFT = 'LEFT',
-  RIGHT = 'RIGHT',
-  NONE = 'NONE'
+export enum PlayerState {
+  ALIVE = 'ALIVE',
+  INVULNERABLE = 'INVULNERABLE',
+  DEAD = 'DEAD'
 }
 
 /**
- * Interface defining the player's state
+ * Interface defining the configuration options for a Player instance
  */
-export interface IPlayerState {
+export interface PlayerConfig {
   x: number;
   y: number;
   width: number;
   height: number;
   speed: number;
   lives: number;
-  isAlive: boolean;
-  score: number;
-  movementDirection: PlayerMovementDirection;
-  canShoot: boolean;
-  lastShotTime: number;
-  shootCooldown: number;
+  maxLives?: number;
 }
 
 /**
- * Represents a projectile fired by the player
- */
-export interface IProjectile {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  speed: number;
-}
-
-/**
- * Player class representing the main controllable entity in the game
+ * Player class representing the main player entity in the game
  */
 export class Player {
-  private state: IPlayerState;
-  private readonly MIN_X: number = 0;
-  private readonly MAX_X: number;
-  private readonly SHOOT_COOLDOWN: number = 250; // Cooldown in milliseconds
-  
+  private readonly _width: number;
+  private readonly _height: number;
+  private readonly _speed: number;
+  private readonly _maxLives: number;
+
+  private _x: number;
+  private _y: number;
+  private _lives: number;
+  private _state: PlayerState;
+  private _invulnerabilityTimer: number;
+  private _score: number;
+
   /**
    * Creates a new Player instance
-   * @param canvasWidth - The width of the game canvas
-   * @param canvasHeight - The height of the game canvas
+   * @param config - Configuration options for the player
    */
-  constructor(canvasWidth: number, canvasHeight: number) {
-    this.MAX_X = canvasWidth;
+  constructor(config: PlayerConfig) {
+    this._x = config.x;
+    this._y = config.y;
+    this._width = config.width;
+    this._height = config.height;
+    this._speed = config.speed;
+    this._lives = config.lives;
+    this._maxLives = config.maxLives || 3;
+    this._state = PlayerState.ALIVE;
+    this._invulnerabilityTimer = 0;
+    this._score = 0;
+
+    this.validateConfig(config);
+  }
+
+  /**
+   * Validates the configuration parameters
+   * @param config - Configuration to validate
+   * @throws Error if configuration is invalid
+   */
+  private validateConfig(config: PlayerConfig): void {
+    if (config.width <= 0 || config.height <= 0) {
+      throw new Error('Player dimensions must be positive numbers');
+    }
+    if (config.speed <= 0) {
+      throw new Error('Player speed must be a positive number');
+    }
+    if (config.lives <= 0 || config.lives > this._maxLives) {
+      throw new Error(`Lives must be between 1 and ${this._maxLives}`);
+    }
+  }
+
+  // Getters
+  get x(): number { return this._x; }
+  get y(): number { return this._y; }
+  get width(): number { return this._width; }
+  get height(): number { return this._height; }
+  get speed(): number { return this._speed; }
+  get lives(): number { return this._lives; }
+  get state(): PlayerState { return this._state; }
+  get score(): number { return this._score; }
+  get isAlive(): boolean { return this._state !== PlayerState.DEAD; }
+
+  /**
+   * Updates the player's position
+   * @param deltaX - Change in x position
+   * @param deltaY - Change in y position
+   */
+  move(deltaX: number, deltaY: number): void {
+    this._x += deltaX * this._speed;
+    this._y += deltaY * this._speed;
+  }
+
+  /**
+   * Sets the player's absolute position
+   * @param x - New x position
+   * @param y - New y position
+   */
+  setPosition(x: number, y: number): void {
+    this._x = x;
+    this._y = y;
+  }
+
+  /**
+   * Handles player taking damage
+   * @returns boolean indicating if the player was damaged
+   */
+  takeDamage(): boolean {
+    if (this._state === PlayerState.INVULNERABLE) {
+      return false;
+    }
+
+    this._lives--;
     
-    this.state = {
-      x: canvasWidth / 2, // Start at center
-      y: canvasHeight - 50, // Position near bottom
-      width: 50, // Default player width
-      height: 30, // Default player height
-      speed: 5, // Default movement speed
-      lives: 3, // Starting lives
-      isAlive: true,
-      score: 0,
-      movementDirection: PlayerMovementDirection.NONE,
-      canShoot: true,
-      lastShotTime: 0,
-      shootCooldown: this.SHOOT_COOLDOWN
-    };
+    if (this._lives <= 0) {
+      this._state = PlayerState.DEAD;
+    } else {
+      this._state = PlayerState.INVULNERABLE;
+      this._invulnerabilityTimer = 2000; // 2 seconds of invulnerability
+    }
+
+    return true;
   }
 
   /**
-   * Updates the player's position and shooting state
-   * @returns void
+   * Updates the player's state
+   * @param deltaTime - Time elapsed since last update in milliseconds
    */
-  public update(): void {
-    // Update movement
-    switch (this.state.movementDirection) {
-      case PlayerMovementDirection.LEFT:
-        this.moveLeft();
-        break;
-      case PlayerMovementDirection.RIGHT:
-        this.moveRight();
-        break;
-      default:
-        break;
-    }
-
-    // Update shooting cooldown
-    const currentTime = Date.now();
-    if (!this.state.canShoot && 
-        currentTime - this.state.lastShotTime >= this.state.shootCooldown) {
-      this.state.canShoot = true;
+  update(deltaTime: number): void {
+    if (this._state === PlayerState.INVULNERABLE) {
+      this._invulnerabilityTimer -= deltaTime;
+      if (this._invulnerabilityTimer <= 0) {
+        this._state = PlayerState.ALIVE;
+        this._invulnerabilityTimer = 0;
+      }
     }
   }
 
   /**
-   * Attempts to fire a projectile
-   * @returns IProjectile | null - The created projectile or null if cannot shoot
+   * Adds points to the player's score
+   * @param points - Points to add
    */
-  public shoot(): IProjectile | null {
-    if (!this.state.canShoot || !this.state.isAlive) {
-      return null;
+  addScore(points: number): void {
+    if (points < 0) {
+      throw new Error('Cannot add negative points');
     }
-
-    this.state.canShoot = false;
-    this.state.lastShotTime = Date.now();
-
-    // Create and return a new projectile
-    return {
-      x: this.state.x + (this.state.width / 2) - 2, // Center of player
-      y: this.state.y, // Top of player
-      width: 4, // Projectile width
-      height: 10, // Projectile height
-      speed: 7 // Projectile speed
-    };
+    this._score += points;
   }
 
   /**
-   * Checks if the player can currently shoot
-   * @returns boolean indicating if player can shoot
+   * Adds an extra life to the player if below maximum
+   * @returns boolean indicating if life was added
    */
-  public canShoot(): boolean {
-    return this.state.canShoot && this.state.isAlive;
-  }
-
-  // ... [Previous movement methods remain unchanged]
-  private moveLeft(): void {
-    const newX = this.state.x - this.state.speed;
-    this.state.x = Math.max(this.MIN_X, newX);
-  }
-
-  private moveRight(): void {
-    const newX = this.state.x + this.state.speed;
-    this.state.x = Math.min(this.MAX_X - this.state.width, newX);
-  }
-
-  public setMovementDirection(direction: PlayerMovementDirection): void {
-    this.state.movementDirection = direction;
-  }
-
-  // ... [Previous state management methods remain unchanged]
-  public takeDamage(): boolean {
-    this.state.lives--;
-    this.state.isAlive = this.state.lives > 0;
-    return this.state.isAlive;
-  }
-
-  public addScore(points: number): void {
-    this.state.score += points;
-  }
-
-  public getPosition(): { x: number; y: number } {
-    return {
-      x: this.state.x,
-      y: this.state.y
-    };
-  }
-
-  public getDimensions(): { width: number; height: number } {
-    return {
-      width: this.state.width,
-      height: this.state.height
-    };
-  }
-
-  public getState(): Readonly<IPlayerState> {
-    return { ...this.state };
-  }
-
-  public isAlive(): boolean {
-    return this.state.isAlive;
-  }
-
-  public getScore(): number {
-    return this.state.score;
-  }
-
-  public getLives(): number {
-    return this.state.lives;
+  addLife(): boolean {
+    if (this._lives < this._maxLives) {
+      this._lives++;
+      return true;
+    }
+    return false;
   }
 
   /**
    * Resets the player to initial state
+   * @param config - Optional configuration for reset state
    */
-  public reset(): void {
-    this.state = {
-      ...this.state,
-      lives: 3,
-      isAlive: true,
-      score: 0,
-      movementDirection: PlayerMovementDirection.NONE,
-      canShoot: true,
-      lastShotTime: 0
-    };
+  reset(config?: Partial<PlayerConfig>): void {
+    if (config?.x !== undefined) this._x = config.x;
+    if (config?.y !== undefined) this._y = config.y;
+    if (config?.lives !== undefined) this._lives = config.lives;
+    
+    this._state = PlayerState.ALIVE;
+    this._invulnerabilityTimer = 0;
+    this._score = 0;
   }
 }
