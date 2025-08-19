@@ -1,12 +1,7 @@
 /**
- * @file Entity.ts
- * @description Base entity class for all game objects in Space Invaders
+ * Represents a position vector in 2D space
  */
-
-/**
- * Represents a position in 2D space
- */
-export interface Vector2D {
+interface Vector2D {
     x: number;
     y: number;
 }
@@ -14,13 +9,14 @@ export interface Vector2D {
 /**
  * Represents the dimensions of an entity
  */
-export interface Dimensions {
+interface Dimensions {
     width: number;
     height: number;
 }
 
 /**
- * Base entity class that all game objects inherit from
+ * Base entity class for all game objects
+ * Provides core functionality for position, movement, and basic game object properties
  */
 export abstract class Entity {
     private _position: Vector2D;
@@ -31,25 +27,22 @@ export abstract class Entity {
 
     /**
      * Creates a new Entity instance
-     * @param position Initial position of the entity
-     * @param dimensions Width and height of the entity
-     * @param velocity Initial velocity of the entity
+     * @param x - Initial x position
+     * @param y - Initial y position
+     * @param width - Entity width
+     * @param height - Entity height
      */
-    constructor(
-        position: Vector2D = { x: 0, y: 0 },
-        dimensions: Dimensions = { width: 0, height: 0 },
-        velocity: Vector2D = { x: 0, y: 0 }
-    ) {
-        this._position = { ...position };
-        this._dimensions = { ...dimensions };
-        this._velocity = { ...velocity };
+    constructor(x: number, y: number, width: number, height: number) {
+        this._position = { x, y };
+        this._velocity = { x: 0, y: 0 };
+        this._dimensions = { width, height };
         this._active = true;
         this._id = this.generateId();
     }
 
     /**
      * Generates a unique identifier for the entity
-     * @returns A unique string ID
+     * @returns Unique string identifier
      */
     private generateId(): string {
         return `entity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -57,7 +50,7 @@ export abstract class Entity {
 
     /**
      * Updates the entity's position based on its velocity
-     * @param deltaTime Time elapsed since last update in seconds
+     * @param deltaTime - Time elapsed since last update in seconds
      */
     public update(deltaTime: number): void {
         this._position.x += this._velocity.x * deltaTime;
@@ -65,77 +58,97 @@ export abstract class Entity {
     }
 
     /**
-     * Checks if this entity collides with another entity
-     * @param other The other entity to check collision with
-     * @returns True if the entities collide, false otherwise
+     * Gets the entity's current position
      */
-    public collidesWith(other: Entity): boolean {
-        return (
-            this._position.x < other._position.x + other._dimensions.width &&
-            this._position.x + this._dimensions.width > other._position.x &&
-            this._position.y < other._position.y + other._dimensions.height &&
-            this._position.y + this._dimensions.height > other._position.y
-        );
-    }
-
-    // Getters and setters
-    get position(): Vector2D {
+    public get position(): Vector2D {
         return { ...this._position };
     }
 
-    set position(newPosition: Vector2D) {
+    /**
+     * Sets the entity's position
+     */
+    public set position(newPosition: Vector2D) {
         this._position = { ...newPosition };
     }
 
-    get velocity(): Vector2D {
+    /**
+     * Gets the entity's current velocity
+     */
+    public get velocity(): Vector2D {
         return { ...this._velocity };
     }
 
-    set velocity(newVelocity: Vector2D) {
+    /**
+     * Sets the entity's velocity
+     */
+    public set velocity(newVelocity: Vector2D) {
         this._velocity = { ...newVelocity };
     }
 
-    get dimensions(): Dimensions {
+    /**
+     * Gets the entity's dimensions
+     */
+    public get dimensions(): Dimensions {
         return { ...this._dimensions };
     }
 
-    set dimensions(newDimensions: Dimensions) {
-        this._dimensions = { ...newDimensions };
-    }
-
-    get active(): boolean {
-        return this._active;
-    }
-
-    set active(value: boolean) {
-        this._active = value;
-    }
-
-    get id(): string {
+    /**
+     * Gets the entity's unique identifier
+     */
+    public get id(): string {
         return this._id;
     }
 
     /**
-     * Gets the bounding box of the entity
-     * @returns Object containing the bounds of the entity
+     * Gets whether the entity is active
      */
-    public getBounds(): {
-        left: number;
-        right: number;
-        top: number;
-        bottom: number;
-    } {
+    public get active(): boolean {
+        return this._active;
+    }
+
+    /**
+     * Sets whether the entity is active
+     */
+    public set active(value: boolean) {
+        this._active = value;
+    }
+
+    /**
+     * Gets the entity's bounding box for collision detection
+     * @returns Object containing position and dimensions for collision checking
+     */
+    public getBoundingBox(): { position: Vector2D; dimensions: Dimensions } {
         return {
-            left: this._position.x,
-            right: this._position.x + this._dimensions.width,
-            top: this._position.y,
-            bottom: this._position.y + this._dimensions.height,
+            position: this.position,
+            dimensions: this.dimensions
         };
     }
 
     /**
-     * Abstract method that must be implemented by derived classes
-     * to handle entity-specific rendering logic
+     * Checks if this entity collides with another entity
+     * @param other - The other entity to check collision with
+     * @returns True if entities collide, false otherwise
      */
-    public abstract render(context: CanvasRenderingContext2D): void;
+    public collidesWith(other: Entity): boolean {
+        const thisBox = this.getBoundingBox();
+        const otherBox = other.getBoundingBox();
+
+        return (
+            thisBox.position.x < otherBox.position.x + otherBox.dimensions.width &&
+            thisBox.position.x + thisBox.dimensions.width > otherBox.position.x &&
+            thisBox.position.y < otherBox.position.y + otherBox.dimensions.height &&
+            thisBox.position.y + thisBox.dimensions.height > otherBox.position.y
+        );
+    }
+
+    /**
+     * Abstract method to be implemented by derived classes
+     * Handles specific behavior when entity is destroyed
+     */
+    public abstract onDestroy(): void;
 }
+
+/**
+ * Export interfaces for use in other files
+ */
+export type { Vector2D, Dimensions };
